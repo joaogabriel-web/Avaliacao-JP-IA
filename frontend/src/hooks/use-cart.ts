@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DEMO_PRODUCTS, type CartItem, type Product } from "@/data/menu";
 
 const CART_STORAGE_KEY = "kuroi_sushi_demo_cart_v1";
@@ -62,9 +62,22 @@ function persistCart(items: CartItem[]): void {
 export function useCart(catalog: Product[] = DEMO_PRODUCTS) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  const hasHydrated = useRef(false);
 
   useEffect(() => {
-    setItems(loadStoredCart(catalog));
+    if (catalog.length === 0) return;
+    const catalogMap = new Map(catalog.map((product) => [product.id, product]));
+    setItems((current) => {
+      if (!hasHydrated.current) {
+        hasHydrated.current = true;
+        return loadStoredCart(catalog);
+      }
+      return current.flatMap((item) => {
+        const product = catalogMap.get(item.product.id);
+        if (!product || product.stock <= 0) return [];
+        return [{ product, quantity: Math.min(item.quantity, product.stock) }];
+      });
+    });
     setHydrated(true);
   }, [catalog]);
 

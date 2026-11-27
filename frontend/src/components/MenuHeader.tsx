@@ -24,7 +24,7 @@ export function MenuHeader({ itemCount, subtotal, onOpenCart }: MenuHeaderProps)
               Kuroi Sushi
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              Cardápio Digital · Demonstração
+              Cardápio Digital · Pedidos locais
             </p>
           </div>
         </div>

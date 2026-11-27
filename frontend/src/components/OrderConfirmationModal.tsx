@@ -30,7 +30,7 @@ export function OrderConfirmationModal({ order, onStartNewOrder }: OrderConfirma
             Pedido realizado com sucesso
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            Número demonstrativo{" "}
+            Pedido{" "}
             <strong data-testid="demo-order-number" className="text-foreground">
               #{order.orderNumber}
             </strong>{" "}
@@ -45,9 +45,9 @@ export function OrderConfirmationModal({ order, onStartNewOrder }: OrderConfirma
           >
             <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <span>
-              <strong>Aviso demonstrativo:</strong> este pedido foi registrado apenas nesta
-              simulação local e <strong>não foi transmitido</strong> para a cozinha ou para o
-              restaurante.
+              Este pedido foi salvo no banco SQLite local do projeto, mas <strong>não foi
+              transmitido</strong> para a cozinha ou para o restaurante. Nenhum pagamento foi
+              processado.
             </span>
           </div>
 
@@ -70,7 +70,7 @@ export function OrderConfirmationModal({ order, onStartNewOrder }: OrderConfirma
                 </div>
               )}
               <div className="flex justify-between gap-2">
-                <dt className="text-muted-foreground">Pagamento simulado</dt>
+                <dt className="text-muted-foreground">Pagamento (não processado)</dt>
                 <dd className="font-medium text-foreground">
                   {PAYMENT_LABELS[order.paymentMethod]}
                 </dd>

@@ -7,6 +7,17 @@ import catEntradas from "@/assets/cat-entradas.jpg";
 import catBebidas from "@/assets/cat-bebidas.jpg";
 import catSobremesas from "@/assets/cat-sobremesas.jpg";
 
+export const PRODUCT_IMAGES: Record<string, string> = {
+  "cat-combinados": catCombinados,
+  "cat-sushis": catSushis,
+  "cat-sashimis": catSashimis,
+  "cat-temakis": catTemakis,
+  "cat-hotrolls": catHotrolls,
+  "cat-entradas": catEntradas,
+  "cat-bebidas": catBebidas,
+  "cat-sobremesas": catSobremesas,
+};
+
 export type CategoryId =
   | "todos"
   | "combinados"

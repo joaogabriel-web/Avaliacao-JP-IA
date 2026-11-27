@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { AlertTriangle, Loader2, Search, X } from "lucide-react";
 import { toast } from "sonner";
@@ -12,29 +12,29 @@ import { ProductDetailModal } from "@/components/ProductDetailModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  DEMO_PRODUCTS,
   MENU_CATEGORIES,
   type CategoryId,
   type ConfirmedOrder,
   type Product,
 } from "@/data/menu";
 import { useCart } from "@/hooks/use-cart";
+import { fetchMenu } from "@/services/api";
 import { calculateCartTotals, filterProducts } from "@/services/menu-service";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Kuroi Sushi — Cardápio Digital Interativo (Demonstração)" },
+      { title: "Kuroi Sushi — Cardápio Digital Interativo" },
       {
         name: "description",
         content:
-          "Explore o cardápio digital interativo demonstrativo do Kuroi Sushi: combinados, sushis, sashimis, temakis, hot rolls, entradas, bebidas e sobremesas.",
+          "Explore o cardápio digital do Kuroi Sushi: combinados, sushis, sashimis, temakis, hot rolls, entradas, bebidas e sobremesas.",
       },
       { property: "og:title", content: "Kuroi Sushi — Cardápio Digital Interativo" },
       {
         property: "og:description",
         content:
-          "Monte seu pedido demonstrativo de sushi com filtros por categoria, carrinho em tempo real e simulação de pagamento.",
+          "Monte seu pedido de sushi com filtros por categoria, carrinho em tempo real e checkout local.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -44,12 +44,39 @@ export const Route = createFileRoute("/")({
 });
 
 export function MenuPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [menuLoading, setMenuLoading] = useState(true);
+  const [menuError, setMenuError] = useState<string | null>(null);
+  const [reloadMenu, setReloadMenu] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>("todos");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState<ConfirmedOrder | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setMenuLoading(true);
+    setMenuError(null);
+    fetchMenu()
+      .then((menu) => {
+        if (active) setProducts(menu);
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setMenuError(
+            error instanceof Error ? error.message : "Não foi possível carregar o cardápio.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setMenuLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [reloadMenu]);
 
   const {
     items,
@@ -59,12 +86,12 @@ export function MenuPage() {
     updateQuantity,
     removeItem,
     clearCart,
-  } = useCart(DEMO_PRODUCTS);
+  } = useCart(products);
 
   const totals = useMemo(() => calculateCartTotals(items, "pickup"), [items]);
   const filteredProducts = useMemo(
-    () => filterProducts(DEMO_PRODUCTS, selectedCategory, searchQuery),
-    [selectedCategory, searchQuery],
+    () => filterProducts(products, selectedCategory, searchQuery),
+    [products, selectedCategory, searchQuery],
   );
 
   const hasActiveFilters = selectedCategory !== "todos" || searchQuery.trim() !== "";
@@ -106,11 +133,14 @@ export function MenuPage() {
   };
 
   const handleOrderConfirmed = (order: ConfirmedOrder) => {
+    setProducts((current) =>
+      current.map((product) => order.items.find((item) => item.product.id === product.id)?.product ?? product),
+    );
     setCheckoutOpen(false);
     setCartOpen(false);
     clearCart();
     setConfirmedOrder(order);
-    toast.success(`Pedido demonstrativo #${order.orderNumber} confirmado.`);
+    toast.success(`Pedido #${order.orderNumber} salvo localmente.`);
   };
 
   return (
@@ -129,14 +159,14 @@ export function MenuPage() {
         />
         <div className="relative mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
           <p className="text-xs font-medium uppercase tracking-[0.22em] text-hero-foreground/80">
-            Culinária Japonesa Contemporânea · Versão Demonstrativa
+            Culinária Japonesa Contemporânea
           </p>
           <h1 className="mt-3 max-w-2xl font-display text-4xl font-semibold leading-tight tracking-tight sm:text-6xl">
             Sabores frescos, montados no seu ritmo.
           </h1>
           <p className="mt-4 max-w-xl text-sm leading-relaxed text-hero-foreground/85 sm:text-base">
-            Escolha seus pratos favoritos, acompanhe disponibilidade em tempo real e simule seu
-            pedido sem cadastro. Todos os itens, preços e estoques exibidos são demonstrativos.
+            Escolha seus pratos favoritos, acompanhe o estoque do cardápio e registre um pedido
+            localmente. Nenhum pagamento é processado.
           </p>
         </div>
       </section>
@@ -210,20 +240,35 @@ export function MenuPage() {
           </nav>
         </section>
 
-        {/* Indicador amarelo de carregamento inicial */}
         {!hydrated && (
           <div
             role="status"
             className="status-pill-limited mt-6 flex items-center gap-2 rounded-md px-4 py-3 text-sm"
           >
             <Loader2 className="size-4 animate-spin shrink-0" aria-hidden="true" />
-            Carregando preferências locais do carrinho...
+            Carregando carrinho local...
           </div>
         )}
 
         {/* Grade de produtos */}
         <section aria-label="Lista de produtos" className="mt-6">
-          {filteredProducts.length === 0 ? (
+          {menuLoading ? (
+            <div role="status" className="flex items-center justify-center gap-2 py-14 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              Carregando cardápio...
+            </div>
+          ) : menuError ? (
+            <div role="alert" className="rounded-lg border border-status-unavailable/30 bg-card px-6 py-10 text-center">
+              <AlertTriangle className="mx-auto size-8 text-status-unavailable" aria-hidden="true" />
+              <h2 className="mt-3 font-display text-xl font-semibold text-foreground">
+                Não foi possível carregar o cardápio
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">{menuError}</p>
+              <Button type="button" variant="outline" onClick={() => setReloadMenu((value) => value + 1)} className="mt-4">
+                Tentar novamente
+              </Button>
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div
               role="status"
               className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card px-6 py-14 text-center"
@@ -260,10 +305,10 @@ export function MenuPage() {
       <footer className="border-t border-border bg-card py-6">
         <div className="mx-auto flex max-w-6xl flex-col gap-2 px-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <p>
-            <strong className="text-foreground">Kuroi Sushi</strong> · Aplicação demonstrativa
-            executada localmente no navegador.
+            <strong className="text-foreground">Kuroi Sushi</strong> · Aplicação executada
+            localmente.
           </p>
-          <p>Dados, preços, estoques e pedidos são simulados e não enviados a um restaurante real.</p>
+          <p>Pedidos e estoque são armazenados no banco SQLite local; pagamentos não são processados.</p>
         </div>
       </footer>
 

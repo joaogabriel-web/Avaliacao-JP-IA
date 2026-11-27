@@ -31,10 +31,10 @@ import {
   calculateCartTotals,
   calculateChange,
   formatCurrency,
-  generateDemoOrderNumber,
   validateCheckoutForm,
   type FieldValidation,
 } from "@/services/menu-service";
+import { submitOrder } from "@/services/api";
 
 interface CheckoutModalProps {
   open: boolean;
@@ -74,6 +74,7 @@ export function CheckoutModal({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const totals = useMemo(
     () => calculateCartTotals(items, form.fulfillment),
@@ -91,48 +92,38 @@ export function CheckoutModal({
   const markTouched = (field: string) => setTouched((prev) => ({ ...prev, [field]: true }));
   const showField = (field: string) => submitted || Boolean(touched[field]);
 
-  const handleSubmit = (event: FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setSubmitted(true);
     if (!validation.isValid || items.length === 0) return;
 
+    setSubmitError(null);
     setIsSubmitting(true);
-    window.setTimeout(() => {
-      const addressParts = [
-        form.street.trim(),
-        form.number.trim(),
-        form.neighborhood.trim(),
-        form.complement.trim(),
-      ].filter(Boolean);
-
-      const order: ConfirmedOrder = {
-        orderNumber: generateDemoOrderNumber(),
-        createdAt: new Date().toLocaleString("pt-BR"),
+    try {
+      const order = await submitOrder({
+        ...form,
         customerName: form.customerName.trim(),
-        fulfillment: form.fulfillment,
-        paymentMethod: form.paymentMethod,
-        items: items.map((item) => ({ ...item })),
-        subtotal: totals.subtotal,
-        deliveryFee: totals.deliveryFee,
-        discount: totals.discount,
-        total: totals.total,
-        ...(form.fulfillment === "delivery" && addressParts.length > 0
-          ? { addressSummary: addressParts.join(", ") }
-          : {}),
-        ...(form.notes.trim() ? { notes: form.notes.trim() } : {}),
-        ...(form.paymentMethod === "cash" &&
-        changeInfo.paid !== null &&
-        changeInfo.change !== null
-          ? { cashPaid: changeInfo.paid, cashChange: changeInfo.change }
-          : {}),
-      };
-
-      setIsSubmitting(false);
+        street: form.street.trim(),
+        number: form.number.trim(),
+        neighborhood: form.neighborhood.trim(),
+        complement: form.complement.trim(),
+        notes: form.notes.trim(),
+        items: items.map(({ product, quantity }) => ({
+          productId: product.id,
+          quantity,
+        })),
+      });
       setForm(INITIAL_FORM);
       setTouched({});
       setSubmitted(false);
       onOrderConfirmed(order);
-    }, 450);
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Não foi possível registrar o pedido.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -143,8 +134,8 @@ export function CheckoutModal({
             Finalização do pedido
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
-            Revise os itens, informe os dados demonstrativos e escolha a forma de pagamento
-            simulada.
+            Revise os itens e informe os dados para registrar o pedido localmente. Nenhum
+            pagamento será processado.
           </DialogDescription>
         </DialogHeader>
 
@@ -428,13 +419,19 @@ export function CheckoutModal({
             </div>
           )}
 
+          {submitError && (
+            <div role="alert" className="status-pill-unavailable rounded-md px-3 py-2 text-sm">
+              {submitError}
+            </div>
+          )}
+
           {isSubmitting && (
             <div
               role="status"
               className="status-pill-limited flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium"
             >
               <Loader2 className="size-4 animate-spin shrink-0" aria-hidden="true" />
-              Processando pedido demonstrativo...
+              Registrando pedido...
             </div>
           )}
 
